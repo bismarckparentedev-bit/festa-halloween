@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Festa de Halloween</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,800&display=swap">
+<style>
+  /* Layout: céu noturno animado em canvas ao fundo, um cartão de convite centralizado por cima. Visual único (sempre noite). */
+  :root {
+    --night: #0d0a1a;
+    --night-2: #1c1233;
+    --card: rgba(22, 14, 38, 0.86);
+    --line: #3d2a5c;
+    --pumpkin: #ff7a1a;
+    --pumpkin-deep: #c7520a;
+    --ghost: #f3ecff;
+    --mist: #b8a8d6;
+    --slime: #8be04e;
+    --blood: #ff5a6a;
+    --display: "Creepster", "Impact", fantasy;
+    --body: "Nunito Sans", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { min-height: 100%; margin: 0; }
+  body {
+    background: var(--night);
+    color: var(--ghost);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+  .page {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: grid; place-items: start center;
+    padding-block: 48px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .card {
+    width: 100%; max-width: 520px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 28px 24px 26px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,122,26,.08) inset;
+    display: grid; gap: 22px;
+  }
+  header { display: grid; gap: 6px; text-align: center; }
+  .eyebrow {
+    font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--mist);
+  }
+  h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(34px, 9vw, 64px); line-height: 1; letter-spacing: .02em;
+    margin: 4px 0 2px; color: var(--pumpkin);
+    text-shadow: 0 0 18px rgba(255,122,26,.45), 0 3px 0 #5a1f00;
+    text-wrap: balance;
+  }
+  .lead { margin: 0; color: var(--mist); text-wrap: balance; }
+
+  form, .step { display: grid; gap: 20px; }
+  .field { display: grid; gap: 8px; }
+  label.lbl, legend.lbl { font-weight: 800; font-size: 15px; padding: 0; }
+  fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+  input[type="text"] {
+    width: 100%; box-sizing: border-box;
+    font: inherit; color: var(--ghost);
+    background: rgba(13,10,26,.75);
+    border: 1.5px solid var(--line); border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input[type="text"]::placeholder { color: #7d6d9c; }
+  input[type="text"]:focus { outline: none; border-color: var(--pumpkin); box-shadow: 0 0 0 3px rgba(255,122,26,.25); }
+  input[aria-invalid="true"] { border-color: var(--blood); }
+  .err { color: var(--blood); font-size: 13px; font-weight: 600; margin: 0; }
+
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choice { position: relative; }
+  .choice input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .choice span {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px; border-radius: 10px;
+    border: 1.5px solid var(--line); background: rgba(13,10,26,.6);
+    font-weight: 800; cursor: pointer; transition: .15s;
+  }
+  .choice input:checked + span { border-color: var(--pumpkin); background: rgba(255,122,26,.16); color: var(--pumpkin); }
+  .choice input:focus-visible + span { box-shadow: 0 0 0 3px rgba(255,122,26,.35); }
+
+  .guests {
+    display: grid; gap: 12px;
+    border-top: 1px dashed var(--line); padding-top: 18px;
+    animation: rise .35s ease-out;
+  }
+  @keyframes rise { from { transform: translateY(8px); opacity: .4; } to { transform: none; opacity: 1; } }
+  .guests h2 { margin: 0; font-size: 17px; font-weight: 800; }
+  .guests p.hint { margin: -6px 0 0; color: var(--mist); font-size: 14px; }
+  .guest-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+  .icon-btn {
+    width: 44px; height: 44px; border-radius: 10px;
+    border: 1.5px solid var(--line); background: transparent; color: var(--mist);
+    font: inherit; font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--blood); border-color: var(--blood); }
+  .icon-btn:focus-visible, .btn:focus-visible, .link-btn:focus-visible { outline: 2px solid var(--pumpkin); outline-offset: 2px; }
+
+  .btn {
+    font: inherit; font-weight: 800; cursor: pointer;
+    border-radius: 12px; padding: 14px 18px; border: 0;
+    background: linear-gradient(180deg, var(--pumpkin), var(--pumpkin-deep));
+    color: #1a0b00; font-size: 17px;
+    box-shadow: 0 6px 20px rgba(255,122,26,.35);
+    transition: transform .1s, filter .15s;
+    text-decoration: none; text-align: center; display: block;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: translateY(1px); }
+  .btn[disabled] { filter: grayscale(.6) brightness(.8); cursor: progress; }
+  .btn.ghost {
+    background: transparent; color: var(--ghost); box-shadow: none;
+    border: 1.5px solid var(--line);
+  }
+  .btn.add { background: transparent; color: var(--pumpkin); border: 1.5px dashed var(--pumpkin-deep); box-shadow: none; padding: 11px; font-size: 15px; }
+  .btn.wa { background: linear-gradient(180deg, #4cd964, #25a244); color: #04220d; box-shadow: 0 6px 20px rgba(76,217,100,.25); }
+
+  .done { text-align: center; display: grid; gap: 14px; }
+  .done .big { font-family: var(--display); font-size: 40px; color: var(--slime); margin: 0; line-height: 1.05; text-shadow: 0 0 16px rgba(139,224,78,.4); }
+  .summary {
+    text-align: left; background: rgba(13,10,26,.7); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px;
+  }
+  .summary dt { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--mist); font-weight: 800; }
+  .summary dd { margin: 0 0 6px; }
+  .summary ul { margin: 0; padding-left: 20px; }
+  .actions { display: grid; gap: 10px; }
+  .note { color: var(--mist); font-size: 13px; margin: 0; }
+
+
+  @media (prefers-reduced-motion: reduce) {
+    .guests { animation: none; }
+    .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<main class="page">
+  <section class="card" aria-labelledby="t">
+    <header>
+      <span class="eyebrow">Sábado, 31 de outubro · 18h às 2h</span>
+      <h1 id="t">Festa de Halloween</h1>
+      <p class="lead">Confirme sua presença, se tiver coragem.</p>
+    </header>
+
+    <form id="rsvp" class="step" novalidate>
+      <div class="field">
+        <label class="lbl" for="fullName">Seu nome completo</label>
+        <input type="text" id="fullName" name="fullName" autocomplete="name" placeholder="Ex.: Ana Beatriz Souza" required>
+        <p class="err" id="nameErr" hidden>Digite seu nome completo (nome e sobrenome).</p>
+      </div>
+
+      <fieldset>
+        <legend class="lbl">Vai levar convidados?</legend>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="bring" id="bringYes" value="sim"><span>🎃 Sim</span></label>
+          <label class="choice"><input type="radio" name="bring" id="bringNo" value="nao"><span>👻 Não</span></label>
+        </div>
+        <p class="err" id="bringErr" hidden>Escolha Sim ou Não.</p>
+      </fieldset>
+
+      <div class="guests" id="guests" hidden>
+        <h2>Convidados</h2>
+        <p class="hint">Digite o nome completo de cada convidado.</p>
+        <div id="guestList" style="display:grid;gap:10px"></div>
+        <p class="err" id="guestErr" hidden>Preencha o nome completo de todos os convidados (ou remova o campo vazio).</p>
+        <button type="button" class="btn add" id="addGuest">+ Adicionar convidado</button>
+      </div>
+
+      <p class="err" id="sendErr" hidden></p>
+      <button type="submit" class="btn" id="submitBtn">Confirmar presença</button>
+    </form>
+
+    <div id="done" class="done" hidden>
+      <p class="big">Presença confirmada!</p>
+      <dl class="summary" id="summary"></dl>
+      <p class="note">Seu nome já está na lista da portaria. Te esperamos no sábado!</p>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="againBtn">Confirmar outra pessoa</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const form = $("rsvp"), nameInput = $("fullName");
+  const guestsBox = $("guests"), guestList = $("guestList");
+  let guestSeq = 0;
+
+  const clean = (s) => s.replace(/\s+/g, " ").trim();
+  const isFullName = (s) => clean(s).split(" ").filter((p) => p.length >= 2).length >= 2;
+
+  function addGuest(value = "") {
+    guestSeq += 1;
+    const row = document.createElement("div");
+    row.className = "guest-row";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "guest-" + guestSeq;
+    input.placeholder = "Nome completo do convidado";
+    input.setAttribute("aria-label", "Nome completo do convidado");
+    input.value = value;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "icon-btn";
+    rm.setAttribute("aria-label", "Remover convidado");
+    rm.textContent = "×";
+    rm.addEventListener("click", () => {
+      row.remove();
+      if (!guestList.children.length) addGuest();
+      guestList.querySelector("input").focus();
+    });
+    row.append(input, rm);
+    guestList.append(row);
+    return input;
+  }
+
+  function setBring(val) {
+    guestsBox.hidden = val !== "sim";
+    if (val === "sim" && !guestList.children.length) addGuest().focus();
+    $("bringErr").hidden = true;
+  }
+  form.addEventListener("change", (e) => { if (e.target.name === "bring") setBring(e.target.value); });
+  $("addGuest").addEventListener("click", () => addGuest().focus());
+
+  function readForm() {
+    const bring = form.querySelector('input[name="bring"]:checked')?.value || null;
+    const guests = bring === "sim"
+      ? [...guestList.querySelectorAll("input")].map((i) => clean(i.value)).filter(Boolean)
+      : [];
+    return { name: clean(nameInput.value), bring, guests };
+  }
+
+  function validate() {
+    let ok = true;
+    const nameOk = isFullName(nameInput.value);
+    nameInput.setAttribute("aria-invalid", String(!nameOk));
+    $("nameErr").hidden = nameOk;
+    if (!nameOk) ok = false;
+
+    const bring = form.querySelector('input[name="bring"]:checked');
+    $("bringErr").hidden = !!bring;
+    if (!bring) ok = false;
+
+    let guestsOk = true;
+    if (bring?.value === "sim") {
+      [...guestList.querySelectorAll("input")].forEach((i) => {
+        const bad = !isFullName(i.value);
+        i.setAttribute("aria-invalid", String(bad));
+        if (bad) guestsOk = false;
+      });
+    }
+    $("guestErr").hidden = guestsOk;
+    if (!guestsOk) ok = false;
+
+    if (!ok) form.querySelector('[aria-invalid="true"], input[name="bring"]:not(:checked)')?.focus();
+    return ok;
+  }
+
+  function showDone(r) {
+    const dl = $("summary");
+    dl.replaceChildren();
+    const dt1 = document.createElement("dt"); dt1.textContent = "Nome";
+    const dd1 = document.createElement("dd"); dd1.textContent = r.name;
+    const dt2 = document.createElement("dt"); dt2.textContent = "Convidados";
+    const dd2 = document.createElement("dd");
+    if (r.guests.length) {
+      const ul = document.createElement("ul");
+      r.guests.forEach((g) => { const li = document.createElement("li"); li.textContent = g; ul.append(li); });
+      dd2.append(ul);
+    } else dd2.textContent = "Nenhum";
+    dl.append(dt1, dd1, dt2, dd2);
+    form.hidden = true;
+    $("done").hidden = false;
+  }
+
+  // Endereço do Apps Script que grava a confirmação no Google Forms da festa.
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyToBP85pr48mIdcL4vJVlG8I8YFfzk3DS3Eui2B82sE0r40WpmD1ubn_3QephF-qbe/exec";
+
+  async function enviar(dados) {
+    const resp = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(dados),
+    });
+    const r = await resp.json();
+    if (!r.ok) throw new Error(r.erro || "Tente de novo em instantes.");
+    return r;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    const r = readForm();
+    const btn = $("submitBtn");
+    $("sendErr").hidden = true;
+    btn.disabled = true; btn.textContent = "Confirmando…";
+    try {
+      await enviar({ nome: r.name, convidados: r.guests });
+      showDone(r);
+    } catch (err) {
+      $("sendErr").textContent = "Não foi possível confirmar agora. " + ((err && err.message) || "Tente de novo em instantes.");
+      $("sendErr").hidden = false;
+    } finally {
+      btn.disabled = false; btn.textContent = "Confirmar presença";
+    }
+  });
+
+  $("againBtn").addEventListener("click", () => {
+    form.reset();
+    guestList.replaceChildren();
+    guestsBox.hidden = true;
+    $("done").hidden = true;
+    form.hidden = false;
+    nameInput.focus();
+  });
+
+  // ---- Céu de Halloween ----
+  const cv = $("sky"), ctx = cv.getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, dpr = 1, stars = [], bats = [], flies = [], tombs = [];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function setup() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stars = Array.from({ length: Math.round(W * H / 6000) }, () => ({ x: rnd(0, W), y: rnd(0, H * .65), r: rnd(.4, 1.4), p: rnd(0, 6.28) }));
+    bats = Array.from({ length: W < 600 ? 5 : 9 }, () => ({ x: rnd(0, W), y: rnd(H * .08, H * .5), s: rnd(.6, 1.3), v: rnd(.4, 1.1), p: rnd(0, 6.28) }));
+    flies = Array.from({ length: 26 }, () => ({ x: rnd(0, W), y: rnd(H * .7, H), p: rnd(0, 6.28) }));
+    const nTombs = Math.max(4, Math.round(W / 160));
+    tombs = Array.from({ length: nTombs }, (_, i) => ({ x: (i + rnd(.2, .8)) * W / nTombs, w: rnd(18, 30), h: rnd(26, 44) }));
+  }
+
+  function hill(y0, amp, freq, color, phase) {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, y0 + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 2.7) * amp * .3);
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  }
+
+  function tree(x, base, h, flip) {
+    ctx.strokeStyle = "#07050d"; ctx.lineCap = "round";
+    const branch = (x1, y1, len, ang, w) => {
+      if (len < 6) return;
+      const x2 = x1 + Math.cos(ang) * len, y2 = y1 + Math.sin(ang) * len;
+      ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      branch(x2, y2, len * .72, ang - .5 * flip, w * .65);
+      branch(x2, y2, len * .62, ang + .45 * flip, w * .6);
+    };
+    branch(x, base, h, -Math.PI / 2 + .08 * flip, 9);
+  }
+
+  function pumpkin(x, y, s, t) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = "#e0660f";
+    for (const dx of [-12, 12, 0]) { ctx.beginPath(); ctx.ellipse(dx, 0, 16, 18, 0, 0, 6.29); ctx.fill(); }
+    ctx.fillStyle = "#3a5a1c"; ctx.fillRect(-2, -24, 5, 9);
+    const glow = .75 + Math.sin(t * 3 + x) * .2;
+    ctx.fillStyle = `rgba(255,220,90,${glow})`;
+    ctx.beginPath(); ctx.moveTo(-12, -6); ctx.lineTo(-5, -6); ctx.lineTo(-8.5, -12); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(12, -6); ctx.lineTo(5, -6); ctx.lineTo(8.5, -12); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-14, 4); ctx.lineTo(-7, 9); ctx.lineTo(-2, 4); ctx.lineTo(3, 9); ctx.lineTo(8, 4); ctx.lineTo(14, 4); ctx.lineTo(8, 12); ctx.lineTo(-8, 12); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function bat(b, t) {
+    const flap = Math.sin(t * 9 * b.v + b.p) * 0.9;
+    ctx.save(); ctx.translate(b.x, b.y); ctx.scale(b.s, b.s);
+    ctx.fillStyle = "#05030a";
+    ctx.beginPath(); ctx.ellipse(0, 0, 4, 6, 0, 0, 6.29); ctx.fill();
+    for (const side of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(0, -2);
+      ctx.quadraticCurveTo(side * 10, -10 * flap - 6, side * 22, -6 * flap);
+      ctx.quadraticCurveTo(side * 16, 2, side * 12, 0);
+      ctx.quadraticCurveTo(side * 8, 4, 0, 3);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function draw(ms) {
+    const t = ms / 1000;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#0d0a1a"); g.addColorStop(.55, "#2a1546"); g.addColorStop(1, "#4a1f2e");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    stars.forEach((s) => { ctx.fillStyle = `rgba(243,236,255,${.35 + Math.sin(t * 1.5 + s.p) * .3})`; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.29); ctx.fill(); });
+
+    const mx = W * .8, my = H * .18, mr = Math.min(W, H) * .1 + 20;
+    const halo = ctx.createRadialGradient(mx, my, mr * .6, mx, my, mr * 3);
+    halo.addColorStop(0, "rgba(255,230,180,.35)"); halo.addColorStop(1, "rgba(255,230,180,0)");
+    ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fbe9c4"; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 6.29); ctx.fill();
+    ctx.fillStyle = "rgba(200,170,130,.35)";
+    [[-.3, -.2, .18], [.25, .1, .12], [-.05, .35, .1]].forEach(([a, b, r]) => { ctx.beginPath(); ctx.arc(mx + a * mr, my + b * mr, r * mr, 0, 6.29); ctx.fill(); });
+
+    bats.forEach((b) => {
+      if (!reduce) { b.x += b.v * 1.2; b.y += Math.sin(t * 1.3 + b.p) * .4; if (b.x > W + 40) { b.x = -40; b.y = rnd(H * .08, H * .5); } }
+      bat(b, t);
+    });
+
+    hill(H * .78, 22, .004, "#1a0f24", 1);
+    tree(W * .08, H * .8, Math.min(140, H * .16), 1);
+    tree(W * .93, H * .79, Math.min(110, H * .13), -1);
+    hill(H * .87, 14, .007, "#0b0712", 3);
+
+    ctx.fillStyle = "#120b1c";
+    tombs.forEach((s) => {
+      const base = H * .875;
+      ctx.beginPath(); ctx.moveTo(s.x - s.w / 2, base); ctx.lineTo(s.x - s.w / 2, base - s.h + s.w / 2);
+      ctx.arc(s.x, base - s.h + s.w / 2, s.w / 2, Math.PI, 0); ctx.lineTo(s.x + s.w / 2, base); ctx.fill();
+    });
+
+    pumpkin(W * .2, H * .93, W < 600 ? .9 : 1.2, t);
+    pumpkin(W * .72, H * .95, W < 600 ? .7 : 1, t + 1);
+
+    flies.forEach((f) => {
+      const a = .4 + Math.sin(t * 2 + f.p) * .4;
+      const x = f.x + (reduce ? 0 : Math.sin(t * .7 + f.p) * 14), y = f.y + (reduce ? 0 : Math.cos(t * .5 + f.p) * 8);
+      ctx.fillStyle = `rgba(190,255,120,${a})`; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 6.29); ctx.fill();
+    });
+
+    const fog = ctx.createLinearGradient(0, H * .8, 0, H);
+    fog.addColorStop(0, "rgba(184,168,214,0)"); fog.addColorStop(1, "rgba(184,168,214,.14)");
+    ctx.fillStyle = fog; ctx.fillRect(0, H * .8, W, H * .2);
+
+    if (!reduce) requestAnimationFrame(draw);
+  }
+
+  setup();
+  addEventListener("resize", () => { setup(); if (reduce) draw(0); });
+  if (reduce) draw(0); else requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
